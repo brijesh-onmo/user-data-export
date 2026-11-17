@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 /**
  * Every CSV in the zip, in this order. To add one: create files/<name>.js and list it here.
  *
@@ -14,6 +14,4 @@
  *
  *  ctx = { userId, event, knex, redis, mongo }
  */
-module.exports = [
-  require('./account'),
-];
+module.exports = [require("./account"), require("./profiles")];
