@@ -1,0 +1,22 @@
+{
+  "name": "user-data-export",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index-lambda.js",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3",
+    "@aws-sdk/client-secrets-manager": "^3.1170.0",
+    "@aws-sdk/lib-storage": "^3",
+    "@aws-sdk/s3-request-presigner": "^3",
+    "archiver": "^7",
+    "csv-stringify": "^6",
+    "ioredis": "^5",
+    "knex": "^3",
+    "mongoose": "^8",
+    "mysql2": "^3"
+  },
+  "scripts": {
+    "build": "rm -f function.zip && npm ci --omit=dev && zip -qr function.zip index-lambda.js lib files package.json node_modules",
+    "deploy": "npm run build && aws lambda update-function-code --function-name lambda-dev-user-export-p-ap-south-1 --zip-file fileb://function.zip --region ap-south-1 --profile=onmo-dev"
+  }
+}
