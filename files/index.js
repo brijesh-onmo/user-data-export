@@ -20,4 +20,5 @@ module.exports = [
   require("./account"),
   require("./profiles"),
   require("./login-history"),
+  require("./items"),
 ];
