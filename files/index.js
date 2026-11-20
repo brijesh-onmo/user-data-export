@@ -9,9 +9,15 @@
  *  source   (ctx) => async iterable | array    use instead of `query` for
  *                                              Mongo-only / Redis-only files
  *  enrich   optional async (rows, ctx) => rows
- *           runs once per batch of rows. Do ONE redis/mongo call per batch
- *           (mget / pipeline / $in), never one call per row.
+ *           runs once per batch of rows. Mongo: one find with $in per batch.
+ *           Redis is a cluster, so DON'T use mget (fails when keys are on
+ *           different slots). Use Promise.all(keys.map(k => redis.get(k)))
+ *           — auto-pipelining batches these per node, so it's still fast.
  *
- *  ctx = { userId, event, knex, redis, mongo }
+ *  ctx = { userId, productId, event, knex, redis, mongo }
  */
-module.exports = [require("./account"), require("./profiles")];
+module.exports = [
+  require("./account"),
+  require("./profiles"),
+  require("./login-history"),
+];

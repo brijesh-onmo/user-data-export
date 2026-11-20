@@ -2,7 +2,7 @@
 /**
  * User data export Lambda (handler: index-lambda.handler)
  *
- * Invoke with: { "userId": "<users.id>" }
+ * Invoke with: { "userId": "<users.id>", "productId": "<products.id>" }  (both required)
  * Produces:    s3://onmo-<ENVIRONMENT>-data/private/user-data-export/<userId>/<exportId>.zip  (one CSV per entry in files/index.js)
  */
 const { getConnections } = require("./lib/connections");
@@ -18,14 +18,15 @@ function makeExportId(now = new Date()) {
 }
 
 exports.handler = async (event = {}) => {
-  const { userId } = event;
+  const { userId, productId } = event;
   if (!userId) throw new Error("userId is required");
+  if (!productId) throw new Error("productId is required");
 
   const exportId = makeExportId();
   const key = `${config.exportPrefix}/${userId}/${exportId}.zip`;
 
   const { knex, redis, mongo, s3 } = await getConnections();
-  const ctx = { userId, event, knex, redis, mongo };
+  const ctx = { userId, productId, event, knex, redis, mongo };
 
   try {
     const files = await uploadStream(s3, key, "application/zip", (out) =>
@@ -36,7 +37,7 @@ exports.handler = async (event = {}) => {
     console.log("export done", { userId, key, files });
     return { exportId, bucket: config.bucket, key, url, files }; // files = { 'account.csv': rowCount, ... }
   } catch (err) {
-    console.error("export failed", { userId, exportId, err });
+    console.error("export failed", { userId, productId, exportId, err });
     throw err;
   }
 };
