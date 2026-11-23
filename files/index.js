@@ -28,4 +28,5 @@ module.exports = [
   require("./game-library"),
   require("./consents"),
   require("./subscription"),
+  require("./transactions"),
 ];
