@@ -25,4 +25,5 @@ module.exports = [
   require("./friends"),
   require("./device-settings"),
   require("./communication-preferences"),
+  require("./game-library"),
 ];
