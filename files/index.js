@@ -23,4 +23,5 @@ module.exports = [
   require("./items"),
   require("./linked-accounts"),
   require("./friends"),
+  require("./device-settings"),
 ];
