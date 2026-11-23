@@ -27,4 +27,5 @@ module.exports = [
   require("./communication-preferences"),
   require("./game-library"),
   require("./consents"),
+  require("./subscription"),
 ];
