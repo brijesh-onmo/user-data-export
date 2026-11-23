@@ -29,4 +29,5 @@ module.exports = [
   require("./consents"),
   require("./subscription"),
   require("./transactions"),
+  require("./achievements"),
 ];
