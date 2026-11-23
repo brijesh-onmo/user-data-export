@@ -22,4 +22,5 @@ module.exports = [
   require("./login-history"),
   require("./items"),
   require("./linked-accounts"),
+  require("./friends"),
 ];
