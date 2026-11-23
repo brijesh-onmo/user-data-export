@@ -26,4 +26,5 @@ module.exports = [
   require("./device-settings"),
   require("./communication-preferences"),
   require("./game-library"),
+  require("./consents"),
 ];
