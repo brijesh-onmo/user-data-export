@@ -17,12 +17,6 @@ const GATEWAY_LABELS = {
   JUSPAY: "Juspay",
   ONMOPAY: "OnmoPay",
 };
-const PAYMENT_METHOD_LABELS = {
-  upi: "UPI",
-  card: "Card",
-  emandate: "E-mandate",
-  wallet: "Wallet",
-};
 
 const mapped = (map, value) =>
   value
@@ -111,7 +105,7 @@ module.exports = {
       auto_renew: yesNo(r.is_auto_renewing),
       subscribed_on: r.subscribed_on,
       payment_provider: mapped(GATEWAY_LABELS, r.gateway),
-      payment_method: mapped(PAYMENT_METHOD_LABELS, r.payment_method),
+      payment_method: r.payment_method ?? null, // free-form string, exported as stored
       billing_frequency: label(r.frequency),
       mandate_cancelled_on: r.mandate_cancelled_on,
     })),
