@@ -13,9 +13,12 @@
  *
  * Order: profile settings first, then per device: its streaming_config rows, then its
  * device_preferences rows per profile. Disabled profiles are left out.
- * Make & model come from devices.signature; unknown signatures show the raw signature.
+ * Make & model come from devices.signature. Unknown signatures show UNKNOWN_DEVICE: the raw
+ * signature is a device fingerprint and is never exported.
  * updated_on is the user_metadata row's updated_at, so all devices in one JSON value share it.
  */
+
+const UNKNOWN_DEVICE = "Unknown device";
 
 const STREAM_CONFIG_FIELDS = [
   ["resolution", "Resolution"],
@@ -57,11 +60,11 @@ async function* source({ knex, userId }) {
     [userId],
   );
 
-  // device-only key: not tied to a profile
+  // device-only key: always stored on the account row (profile_id = user_id)
   const [streamSettings] = await knex.raw(
     `SELECT um.value, DATE_FORMAT(um.updated_at, '%Y-%m-%d %H:%i:%s') AS updated_on
        FROM user_metadata um
-      WHERE um.user_id = ? AND um.name = 'streaming_config'
+      WHERE um.user_id = ? AND um.profile_id = um.user_id AND um.name = 'streaming_config'
       ORDER BY um.updated_at`,
     [userId],
   );
@@ -147,7 +150,7 @@ async function* source({ knex, userId }) {
   }
 
   for (const [sig, { stream, prefs }] of devices) {
-    const device = deviceName.get(sig) ?? sig;
+    const device = deviceName.get(sig) ?? UNKNOWN_DEVICE;
     for (const r of stream) {
       yield {
         profile_name: null,
