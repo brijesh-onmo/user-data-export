@@ -7,7 +7,7 @@
  * the user consented to a different version, the version segment in the URL path
  * (/<lang>/v<N>/) is swapped for the consented one.
  */
-const { formatUtc, label } = require("../lib/format");
+const { formatUtc, label, sourceLabel } = require("../lib/format");
 
 function parseAssets(assets) {
   if (!assets) return {};
@@ -95,7 +95,7 @@ module.exports = {
       document_url: documentUrl(c, assetsById),
       shown_text: c.consentText ?? null,
       language: c.language ?? null,
-      source: label(c.source),
+      source: sourceLabel(c.source),
     }));
   },
 };

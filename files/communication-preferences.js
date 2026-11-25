@@ -7,29 +7,28 @@
  *       categories:  { <CATEGORY>: { enabled, source, updatedAt } },
  *       optInPrompt: { dismissCount, lastDismissedAt } } } }
  *
- * - One row per channel + category. ACCOUNT is mandatory, so every channel gets an
- *   Account row with opted_in = Yes (source / updatedAt filled if stored).
+ * - One row per channel + stored category. A category that isn't stored = not receiving it -> no row.
+ * - ACCOUNT is on by default for every account and isn't stored, so every channel always gets an
+ *   Account row: opted_in = Yes, changed_via = "Default" (unless something was actually stored).
+ * - DEFAULT_CHANNELS are always present, so a user with no stored preferences still gets their
+ *   Account row(s).
  * - optInPrompt is per channel, so its values repeat on every row of that channel.
- * - A channel with a prompt but no categories still gets its Account row, so dismissals aren't lost.
  */
-const { formatUtc } = require("../lib/format");
+const { formatUtc, label, sourceLabel } = require("../lib/format");
 
+const DEFAULT_CHANNELS = ["WHATSAPP"];
 const CHANNEL_LABELS = { WHATSAPP: "WhatsApp" };
 const CATEGORY_ORDER = ["ACCOUNT", "UPDATES", "ENGAGEMENT"];
+const DEFAULT_SOURCE_LABEL = "Default";
 
-// UPDATES -> Updates, SOME_THING -> Some Thing
-function label(value) {
-  if (!value) return null;
-  return String(value)
-    .toLowerCase()
-    .split(/[_\s]+/)
-    .filter(Boolean)
-    .map((w) => w[0].toUpperCase() + w.slice(1))
-    .join(" ");
-}
 const channelLabel = (c) => CHANNEL_LABELS[c] ?? label(c);
 const isoToUtc = (iso) => (iso ? formatUtc(Date.parse(iso)) : null);
-const yesNo = (v) => (v === true ? "Yes" : v === false ? "No" : null);
+// accepts booleans and "true"/"false" stored as text
+function yesNo(v) {
+  if (v === true || v === "true") return "Yes";
+  if (v === false || v === "false") return "No";
+  return null;
+}
 
 function sortCategories(names) {
   const rank = (n) =>
@@ -39,35 +38,51 @@ function sortCategories(names) {
   return names.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 }
 
-async function* source({ knex, userId, productId }) {
+// the product's stored channels, or {} when nothing usable is stored
+async function storedChannels(knex, userId, productId) {
   const [rows] = await knex.raw(
     `SELECT value FROM user_metadata
       WHERE user_id = ? AND profile_id = ? AND name = 'notification_preferences'`,
     [userId, userId],
   );
-  if (!rows.length) return;
-
-  let prefs;
+  if (!rows.length) return {};
   try {
-    prefs = JSON.parse(rows[0].value);
+    const channels = JSON.parse(rows[0].value)?.[productId];
+    return channels && typeof channels === "object" ? channels : {};
   } catch (err) {
     console.warn(
-      "communication_preferences: malformed notification_preferences, skipped",
-      { userId, error: err.message },
+      "communication_preferences: malformed notification_preferences, using defaults",
+      {
+        userId,
+        error: err.message,
+      },
     );
-    return;
+    return {};
   }
+}
 
-  const channels = prefs?.[productId];
-  if (!channels || typeof channels !== "object") return;
+async function* source({ knex, userId, productId }) {
+  const channels = { ...(await storedChannels(knex, userId, productId)) };
+  for (const c of DEFAULT_CHANNELS) if (!channels[c]) channels[c] = {};
 
   for (const [channel, data] of Object.entries(channels)) {
     const categories = { ...(data?.categories ?? {}) };
-    if (!categories.ACCOUNT) categories.ACCOUNT = {}; // mandatory, always opted in
 
     const prompt = {
       times_prompt_dismissed: data?.optInPrompt?.dismissCount ?? null,
       last_dismissed_on: isoToUtc(data?.optInPrompt?.lastDismissedAt),
+    };
+
+    // Account: always on, never a user choice
+    const account = categories.ACCOUNT ?? {};
+    delete categories.ACCOUNT;
+    yield {
+      channel: channelLabel(channel),
+      category: label("ACCOUNT"),
+      opted_in: "Yes",
+      changed_via: sourceLabel(account.source) ?? DEFAULT_SOURCE_LABEL,
+      last_updated_at: isoToUtc(account.updatedAt),
+      ...prompt,
     };
 
     for (const category of sortCategories(Object.keys(categories))) {
@@ -75,8 +90,8 @@ async function* source({ knex, userId, productId }) {
       yield {
         channel: channelLabel(channel),
         category: label(category),
-        opted_in: category === "ACCOUNT" ? "Yes" : yesNo(c.enabled),
-        changed_via: label(c.source),
+        opted_in: yesNo(c.enabled),
+        changed_via: sourceLabel(c.source),
         last_updated_at: isoToUtc(c.updatedAt),
         ...prompt,
       };
