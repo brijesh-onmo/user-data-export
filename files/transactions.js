@@ -15,13 +15,9 @@
  * Merge: subscription payments are few, so they're loaded up front; coin rows are streamed and the
  * payments are slotted in by date (both are formatted as "YYYY-MM-DD HH:MM:SS", so strings compare).
  */
-const { label } = require("../lib/format");
+const { label, coinLabel } = require("../lib/format");
 
 // coins
-const CURRENCY_LABELS = {
-  gz_tokens: "GZ Tokens",
-  spendable_gz_tokens: "Spendable GZ Tokens",
-};
 const COIN_SOURCE_BY_TYPE = {
   subscription: "Onmopay",
   subscription_cancel: "Onmopay",
@@ -79,7 +75,7 @@ function coinRow(r) {
     category: "Coins",
     type: label(r.transaction_type),
     amount: r.amount,
-    currency: CURRENCY_LABELS[r.item_type] ?? label(r.item_type),
+    currency: coinLabel(r.item_type),
     status: "Success",
     item: r.item ?? null,
     source: COIN_SOURCE_BY_TYPE[r.transaction_type] ?? null,

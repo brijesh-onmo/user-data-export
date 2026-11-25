@@ -30,4 +30,5 @@ module.exports = [
   require("./subscription"),
   require("./transactions"),
   require("./achievements"),
+  require("./game-sessions"),
 ];
