@@ -4,23 +4,23 @@ Every export is a zip of the CSV files below, in this order. All dates are UTC, 
 
 Input: `{ "userId": "<users.id>", "productId": "<products.id>" }`
 
-| File                          | Product specific?                           |
-| ----------------------------- | ------------------------------------------- |
-| account.csv                   | No                                          |
-| profiles.csv                  | Partially (only `aaa`)                      |
-| login_history.csv             | Yes                                         |
-| items.csv                     | No                                          |
-| linked_accounts.csv           | Partially (only `aaa`)                      |
-| friends.csv                   | Partially (all products except `aaa`)       |
-| device_settings.csv           | No                                          |
-| communication_preferences.csv | Yes                                         |
-| game_library.csv              | Yes                                         |
-| consents.csv                  | Yes                                         |
-| subscription.csv              | Yes                                         |
-| transactions.csv              | Partly: subscription rows yes, coin rows no |
-| achievements.csv              | Partly: rules yes, current tier no          |
-| game_sessions.csv             | Yes (legacy sessions count as `onmo`)       |
-| wallets.csv                   | No                                          |
+| File                          | Product specific?                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------ |
+| account.csv                   | No                                                                                         |
+| profiles.csv                  | Partially (only `aaa`)                                                                     |
+| login_history.csv             | Yes                                                                                        |
+| items.csv                     | No                                                                                         |
+| linked_accounts.csv           | Partially (only `aaa`)                                                                     |
+| friends.csv                   | Partially (all products except `aaa`)                                                      |
+| device_settings.csv           | No                                                                                         |
+| communication_preferences.csv | Yes                                                                                        |
+| game_library.csv              | Yes                                                                                        |
+| consents.csv                  | Yes                                                                                        |
+| subscription.csv              | Yes                                                                                        |
+| transactions.csv              | Partially (Only Subscription transactions are product specific, coin transactions are not) |
+| achievements.csv              | Partially (Only if the event rule has productID defined)                                   |
+| game_sessions.csv             | Yes (legacy sessions count as `onmo`)                                                      |
+| wallets.csv                   | No                                                                                         |
 
 Which product gets `profiles.csv`, `linked_accounts.csv` and `friends.csv` is decided in one place: `HEADER_ONLY_FILES` in `lib/product-files.js`. When a file doesn't apply to the requested product, it's still in the zip with the header row only.
 
