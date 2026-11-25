@@ -7,11 +7,11 @@ Input: `{ "userId": "<users.id>", "productId": "<products.id>" }`
 | File                          | Product specific?                           |
 | ----------------------------- | ------------------------------------------- |
 | account.csv                   | No                                          |
-| profiles.csv                  | Yes (only `aaa`)                            |
+| profiles.csv                  | Partially (only `aaa`)                      |
 | login_history.csv             | Yes                                         |
 | items.csv                     | No                                          |
-| linked_accounts.csv           | Yes (only `aaa`)                            |
-| friends.csv                   | Partially (`aaa` has no friends)            |
+| linked_accounts.csv           | Partially (only `aaa`)                      |
+| friends.csv                   | Partially (all products except `aaa`)       |
 | device_settings.csv           | No                                          |
 | communication_preferences.csv | Yes                                         |
 | game_library.csv              | Yes                                         |
@@ -21,6 +21,8 @@ Input: `{ "userId": "<users.id>", "productId": "<products.id>" }`
 | achievements.csv              | Partly: rules yes, current tier no          |
 | game_sessions.csv             | Yes (legacy sessions count as `onmo`)       |
 | wallets.csv                   | No                                          |
+
+Which product gets `profiles.csv`, `linked_accounts.csv` and `friends.csv` is decided in one place: `HEADER_ONLY_FILES` in `lib/product-files.js`. When a file doesn't apply to the requested product, it's still in the zip with the header row only.
 
 ---
 
@@ -95,7 +97,7 @@ Only generated when `productId` is `aaa`. For any other product the file contain
 
 ## friends.csv
 
-Source: MySQL `user_followers` + `users` (disabled users excluded). People the user follows first, then followers not followed back; each newest first.
+Source: MySQL `user_followers` + `users`. Disabled users are included (the relationship is the requester's data); service users are excluded. People the user follows first, then followers not followed back; each newest first.
 
 Product `aaa` does not support friends: for `aaa` the file contains the header row only.
 

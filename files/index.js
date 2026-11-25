@@ -16,7 +16,7 @@
  *
  *  ctx = { userId, productId, event, knex, redis, mongo }
  */
-module.exports = [
+const FILES = [
   require("./account"),
   require("./profiles"),
   require("./login-history"),
@@ -30,6 +30,11 @@ module.exports = [
   require("./subscription"),
   require("./transactions"),
   require("./achievements"),
+  require("./leaderboards"),
   require("./game-sessions"),
   require("./wallets"),
 ];
+
+require("../lib/product-files").assertKnownFiles(FILES.map((f) => f.name));
+
+module.exports = FILES;
