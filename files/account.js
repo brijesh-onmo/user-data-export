@@ -24,7 +24,7 @@ module.exports = {
        )                                            AS sign_in_method,
        DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_on
      FROM users
-     WHERE id = ?`,
+     WHERE id = ? AND disable = 0`,
     [userId],
   ],
 };
