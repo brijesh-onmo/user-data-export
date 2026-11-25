@@ -31,4 +31,5 @@ module.exports = [
   require("./transactions"),
   require("./achievements"),
   require("./game-sessions"),
+  require("./wallets"),
 ];
