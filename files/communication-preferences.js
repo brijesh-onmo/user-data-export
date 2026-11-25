@@ -10,13 +10,14 @@
  * - One row per channel + stored category. A category that isn't stored = not receiving it -> no row.
  * - ACCOUNT is on by default for every account and isn't stored, so every channel always gets an
  *   Account row: opted_in = Yes, changed_via = "Default" (unless something was actually stored).
- * - DEFAULT_CHANNELS are always present, so a user with no stored preferences still gets their
- *   Account row(s).
+ * - DEFAULT_CHANNELS_BY_PRODUCT: channels always present for a product, even with nothing stored,
+ *   so the user still gets their Account row (aaa: WhatsApp). Other products only show channels
+ *   that have stored data.
  * - optInPrompt is per channel, so its values repeat on every row of that channel.
  */
 const { formatUtc, label, sourceLabel } = require("../lib/format");
 
-const DEFAULT_CHANNELS = ["WHATSAPP"];
+const DEFAULT_CHANNELS_BY_PRODUCT = { aaa: ["WHATSAPP"] };
 const CHANNEL_LABELS = { WHATSAPP: "WhatsApp" };
 const CATEGORY_ORDER = ["ACCOUNT", "UPDATES", "ENGAGEMENT"];
 const DEFAULT_SOURCE_LABEL = "Default";
@@ -63,7 +64,8 @@ async function storedChannels(knex, userId, productId) {
 
 async function* source({ knex, userId, productId }) {
   const channels = { ...(await storedChannels(knex, userId, productId)) };
-  for (const c of DEFAULT_CHANNELS) if (!channels[c]) channels[c] = {};
+  for (const c of DEFAULT_CHANNELS_BY_PRODUCT[productId] ?? [])
+    if (!channels[c]) channels[c] = {};
 
   for (const [channel, data] of Object.entries(channels)) {
     const categories = { ...(data?.categories ?? {}) };

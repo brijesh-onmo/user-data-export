@@ -116,7 +116,7 @@ Source: MySQL `user_metadata` (`preferred_eon_cluster`, `streaming_config`, `dev
 | Column       | Description                                                                                                                       |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------- |
 | profile_name | Filled for profile and device+profile settings; empty for device-only settings                                                    |
-| device       | Make and model (raw signature if the device is unknown); empty for profile-only settings                                          |
+| device       | Make and model (`Unknown device` if the device isn't found; raw signatures are never exported); empty for profile-only settings   |
 | setting      | `Preferred Streaming Location`, `Streaming Quality Preset`, `Resolution`, `FPS`, `Bitrate`, `Adaptive Quality`, `Keyboard Layout` |
 | value        | Setting value (no units)                                                                                                          |
 | updated_on   | When the stored setting was last updated                                                                                          |
@@ -127,15 +127,18 @@ Scope by key: `preferred_eon_cluster` = profile; `streaming_config` = device; `d
 
 Source: MySQL `user_metadata` (`notification_preferences`, account level) for the input product.
 
-| Column                 | Description                                                  |
-| ---------------------- | ------------------------------------------------------------ |
-| channel                | e.g. `WhatsApp`                                              |
-| category               | `Account`, `Updates`, `Engagement`                           |
-| opted_in               | Yes / No (`Account` is always Yes)                           |
-| changed_via            | `Settings` or `Prompt`                                       |
-| last_updated_at        | When the category was last changed                           |
-| times_prompt_dismissed | Opt-in prompt dismissals (per channel, repeated on each row) |
-| last_dismissed_on      | Last prompt dismissal (per channel, repeated on each row)    |
+- `Account` is on by default and isn't stored. Every channel shown gets an `Account, Yes, Default` row. For `aaa`, `WhatsApp, Account, Yes, Default` is always present, even when nothing is stored; other products only show channels that have stored data (header only if none).
+- Other categories appear only when stored; a category that isn't stored means the user isn't receiving it.
+
+| Column                 | Description                                                        |
+| ---------------------- | ------------------------------------------------------------------ |
+| channel                | e.g. `WhatsApp`                                                    |
+| category               | `Account`, `Updates`, `Engagement`                                 |
+| opted_in               | Yes / No (`Account` is always Yes)                                 |
+| changed_via            | `Settings` or `Prompt`; `Default` for the Account row              |
+| last_updated_at        | When the category was last changed (empty for the Account default) |
+| times_prompt_dismissed | Opt-in prompt dismissals (per channel, repeated on each row)       |
+| last_dismissed_on      | Last prompt dismissal (per channel, repeated on each row)          |
 
 ## game_library.csv
 
