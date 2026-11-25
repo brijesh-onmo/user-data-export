@@ -67,14 +67,13 @@ Source: Redis (check-ins not yet synced) + MySQL `user_checkins`. Newest first.
 
 ## items.csv
 
-Source: MySQL `item_transactions` (inventory wallet) + `inventory`. What the user owns now, one row per item or bundle. Newest first.
+Source: MySQL `item_transactions` (inventory wallet) + `inventory`. What the user owns now: one row per bundle and one per item (a bundle purchase writes a transaction for the bundle and one per item inside it). Items aren't linked back to their bundle; they share almost the same `acquired_on`. Newest first.
 
 | Column      | Description                                                                                       |
 | ----------- | ------------------------------------------------------------------------------------------------- |
 | name        | Item or bundle title                                                                              |
 | category    | Readable category (e.g. `Avatar`); `AVATAR BUNDLE` for avatar bundles; `Bundle` for other bundles |
-| bundle_name | Bundle the item came from (first acquisition), if any                                             |
-| acquired_on | First time the item was granted                                                                   |
+| acquired_on | First time the item or bundle was granted                                                         |
 
 ## linked_accounts.csv
 
@@ -88,6 +87,11 @@ Only generated when `productId` is `aaa`. For any other product the file contain
 | service      | Always `Steam` for now                    |
 | status       | `Linked`, `Not Linked`, or `Check Failed` |
 | checked_at   | When the check was made                   |
+
+> **Notes / limitations**
+>
+> - **Service is hardcoded to Steam.** Only Steam is checked, and `service` is always `Steam`. If new services need to be exported, the logic in `files/linked-accounts.js` needs to be updated.
+> - **EON client ID is hardcoded per environment** (`eonClientIds` in `lib/config.js`: one client per environment). If one user is allowed to use EON with multiple clients, this export will not be valid and needs to be updated.
 
 ## friends.csv
 
