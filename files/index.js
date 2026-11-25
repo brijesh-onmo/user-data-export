@@ -30,7 +30,6 @@ const FILES = [
   require("./subscription"),
   require("./transactions"),
   require("./achievements"),
-  require("./leaderboards"),
   require("./game-sessions"),
   require("./wallets"),
 ];
