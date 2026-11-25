@@ -4,17 +4,11 @@
  * user_followers: sender_id follows receiver_id. Rows both ways = mutual.
  * Disabled users are left out.
  * Order: people the user follows (newest first), then followers not followed back (newest first).
+ * Product "aaa" doesn't support friends: header-only file, no query run.
  */
-module.exports = {
-  name: "friends.csv",
-  columns: [
-    "username",
-    "following",
-    "mutual",
-    "followed_date",
-    "followed_you_date",
-  ],
-  query: ({ userId }) => [
+const NO_FRIENDS_PRODUCT = "aaa";
+
+const query = ({ userId }) => [
     `SELECT
        u.username                                           AS username,
        IF(f.id IS NOT NULL, 'Yes', 'No')                    AS following,
@@ -32,5 +26,22 @@ module.exports = {
      WHERE p.other_id <> ?
      ORDER BY f.id IS NULL, COALESCE(f.created_at, r.created_at) DESC`,
     [userId, userId, userId, userId, userId],
+];
+
+function source(ctx) {
+  if (ctx.productId === NO_FRIENDS_PRODUCT) return [];
+  const [sql, bindings] = query(ctx);
+  return ctx.knex.raw(sql, bindings).stream();
+}
+
+module.exports = {
+  name: "friends.csv",
+  columns: [
+    "username",
+    "following",
+    "mutual",
+    "followed_date",
+    "followed_you_date",
   ],
+  source,
 };

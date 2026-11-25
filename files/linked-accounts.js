@@ -7,9 +7,12 @@
  *   accountid = user id (the owning account)
  *   client    = EON client for this environment (config.eonClientIds)
  * A failed call doesn't fail the export: the row says "Check Failed" and a warning is logged.
+ * Only generated for product "aaa"; any other product gets a header-only file (no EON calls).
  */
 const config = require("../lib/config");
 const { formatUtc } = require("../lib/format");
+
+const LINKED_ACCOUNTS_PRODUCT = "aaa";
 
 function eonBaseUrl() {
   const raw = (config.eonBaseUrlRaw || "").trim();
@@ -46,7 +49,9 @@ async function checkSteam(baseUrl, clientId, profileId, accountId) {
   return body.status === "success" ? "Linked" : "Not Linked";
 }
 
-async function* source({ knex, userId }) {
+async function* source({ knex, userId, productId }) {
+  if (productId !== LINKED_ACCOUNTS_PRODUCT) return;
+
   const baseUrl = eonBaseUrl();
   const clientId = eonClientId();
 
