@@ -6,11 +6,11 @@ Input: `{ "userId": "<users.id>", "productId": "<products.id>" }`
 
 | File                          | Product specific?                                                                          |
 | ----------------------------- | ------------------------------------------------------------------------------------------ |
-| account.csv                   | No                                                                                         |
-| profiles.csv                  | Partially (only `aaa`)                                                                     |
+| account.csv                   | NA                                                                                         |
+| profiles.csv                  | Yes                                                                                        |
 | login_history.csv             | Yes                                                                                        |
 | items.csv                     | No                                                                                         |
-| linked_accounts.csv           | Partially (only `aaa`)                                                                     |
+| linked_accounts.csv           | Yes                                                                                        |
 | friends.csv                   | Partially (all products except `aaa`)                                                      |
 | device_settings.csv           | No                                                                                         |
 | communication_preferences.csv | Yes                                                                                        |
