@@ -32,6 +32,7 @@ const FILES = [
   require("./achievements"),
   require("./game-sessions"),
   require("./wallets"),
+  require("./unread-notifications"),
 ];
 
 require("../lib/product-files").assertKnownFiles(FILES.map((f) => f.name));

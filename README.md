@@ -4,23 +4,24 @@ Every export is a zip of the CSV files below, in this order. All dates are UTC, 
 
 Input: `{ "userId": "<users.id>", "productId": "<products.id>" }`
 
-| File                          | Product specific?                                                                          |
-| ----------------------------- | ------------------------------------------------------------------------------------------ |
-| account.csv                   | NA                                                                                         |
-| profiles.csv                  | Yes                                                                                        |
-| login_history.csv             | Yes                                                                                        |
-| items.csv                     | No                                                                                         |
-| linked_accounts.csv           | Yes                                                                                        |
-| friends.csv                   | Partially (all products except `aaa`)                                                      |
-| device_settings.csv           | No                                                                                         |
-| communication_preferences.csv | Yes                                                                                        |
-| game_library.csv              | Yes                                                                                        |
-| consents.csv                  | Yes                                                                                        |
-| subscription.csv              | Yes                                                                                        |
-| transactions.csv              | Partially (Only Subscription transactions are product specific, coin transactions are not) |
-| achievements.csv              | Partially (Only if the event rule has productID defined)                                   |
-| game_sessions.csv             | Yes (legacy sessions count as `onmo`)                                                      |
-| wallets.csv                   | No                                                                                         |
+| File                          | Product specific?                           |
+| ----------------------------- | ------------------------------------------- |
+| account.csv                   | No                                          |
+| profiles.csv                  | Partially (only `aaa`)                      |
+| login_history.csv             | Yes                                         |
+| items.csv                     | No                                          |
+| linked_accounts.csv           | Partially (only `aaa`)                      |
+| friends.csv                   | Partially (all products except `aaa`)       |
+| device_settings.csv           | No                                          |
+| communication_preferences.csv | Yes                                         |
+| game_library.csv              | Yes                                         |
+| consents.csv                  | Yes                                         |
+| subscription.csv              | Yes                                         |
+| transactions.csv              | Partly: subscription rows yes, coin rows no |
+| achievements.csv              | Partly: rules yes, current tier no          |
+| game_sessions.csv             | Yes (legacy sessions count as `onmo`)       |
+| wallets.csv                   | No                                          |
+| unread_notifications.csv      | No                                          |
 
 Which product gets `profiles.csv`, `linked_accounts.csv` and `friends.csv` is decided in one place: `HEADER_ONLY_FILES` in `lib/product-files.js`. When a file doesn't apply to the requested product, it's still in the zip with the header row only.
 
@@ -261,3 +262,15 @@ Source: MySQL `item_buckets` (coin wallet). Current balances only; expired coins
 | expires_at | Expiry date for `Expires` rows; empty otherwise  |
 
 Per coin type: one `Total balance` row, a `Does not expire` row if above 0, and one `Expires` row per expiry date (soonest first). Total = does not expire + all expires rows.
+
+## unread_notifications.csv
+
+Source: Mongo `event_data` (`rule_id = e3b3e7a1-60e6-44e5-9300-b14b9679115d`, `index_id = userId`, `data.notifications`) + MySQL `users`, `games`. Every stored notification is unread. Not filtered by product. Newest first.
+
+| Column      | Description                                                                                  |
+| ----------- | -------------------------------------------------------------------------------------------- |
+| received_at | When the notification was created                                                            |
+| type        | Readable type, e.g. `Battle Invitation`, `Global Leaderboard Ended`                          |
+| details     | One readable line, parts separated by `\|` (game title, other player's username, rank, etc.) |
+
+Internal ids (match, tournament, leaderboard, flow), `earnedTags` and `isEndScreenReward` are not exported. Unknown or old types show the raw data in `details`.
