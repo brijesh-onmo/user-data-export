@@ -5,7 +5,7 @@
  *
  * - Disabled users are KEPT: the relationship is the requester's own data (shown with their username).
  * - Service users (is_service_user = 1) are left out.
- * - Which products get this file: lib/product-files.js.
+ * - Exported for every product: follows belong to the account, not a product.
  *
  * Query: each follow row is read once (UNION ALL of both directions, each using its index), then
  * GROUP BY collapses each person to one row with both dates. No duplicate removal, no re-lookups.

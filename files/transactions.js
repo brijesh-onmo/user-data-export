@@ -4,7 +4,8 @@
  *
  * Coins (item_transactions, wallet_type = 'coin'): all products. amount is stored signed
  *   (debits negative). Status is always Success.
- * Subscription (payment_transactions): input product only, every status.
+ * Subscription (payment_transactions): ALL products, every status. `product` column filled
+ * (productLabel). Coins don't belong to a product, so their `product` is empty.
  *   payment_method comes from the mandate for MANDATE_ACT / MANDATE_REN (by mandate_id, or the
  *   user's latest mandate for that tenant + product created before the payment, since mandate_id
  *   isn't always filled). Vouchers get VOUCHER_PAYMENT_METHOD; one-time payments stay blank.
@@ -15,7 +16,7 @@
  * Merge: subscription payments are few, so they're loaded up front; coin rows are streamed and the
  * payments are slotted in by date (both are formatted as "YYYY-MM-DD HH:MM:SS", so strings compare).
  */
-const { label, coinLabel } = require("../lib/format");
+const { label, coinLabel, productLabel } = require("../lib/format");
 
 // coins
 const COIN_SOURCE_BY_TYPE = {
@@ -54,6 +55,7 @@ function paymentMethod(r) {
 
 function paymentRow(r) {
   return {
+    product: productLabel(r.product_id),
     date: r.date,
     category: "Subscription",
     type: PAYMENT_TYPE_LABELS[r.transaction_type] ?? label(r.transaction_type),
@@ -71,6 +73,7 @@ function paymentRow(r) {
 
 function coinRow(r) {
   return {
+    product: null,
     date: r.date,
     category: "Coins",
     type: label(r.transaction_type),
@@ -86,9 +89,10 @@ function coinRow(r) {
   };
 }
 
-async function* source({ knex, userId, productId }) {
+async function* source({ knex, userId }) {
   const [payments] = await knex.raw(
     `SELECT
+       pt.product_id,
        DATE_FORMAT(pt.created_at,  '%Y-%m-%d %H:%i:%s') AS date,
        pt.transaction_type,
        pt.payment_amount,
@@ -110,9 +114,9 @@ async function* source({ knex, userId, productId }) {
      FROM payment_transactions pt
      LEFT JOIN subscription_plans sp    ON sp.id = pt.reference_id
      LEFT JOIN subscription_mandates m  ON m.id = pt.mandate_id
-     WHERE pt.user_id = ? AND pt.product_id = ?
+     WHERE pt.user_id = ?
      ORDER BY pt.created_at DESC`,
-    [userId, productId],
+    [userId],
   );
 
   const coins = knex
@@ -144,6 +148,7 @@ async function* source({ knex, userId, productId }) {
 module.exports = {
   name: "transactions.csv",
   columns: [
+    "product",
     "date",
     "category",
     "type",

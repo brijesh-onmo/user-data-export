@@ -35,6 +35,4 @@ const FILES = [
   require("./unread-notifications"),
 ];
 
-require("../lib/product-files").assertKnownFiles(FILES.map((f) => f.name));
-
 module.exports = FILES;

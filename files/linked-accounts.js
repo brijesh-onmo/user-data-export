@@ -7,7 +7,7 @@
  *   accountid = user id (the owning account)
  *   client    = EON client for this environment (config.eonClientIds)
  * A failed call doesn't fail the export: the row says "Check Failed" and a warning is logged.
- * Which products get this file: lib/product-files.js (header-only elsewhere, no EON calls).
+ * Exported for every product. Users without profiles get no rows and no EON calls.
  */
 const config = require("../lib/config");
 const { formatUtc } = require("../lib/format");

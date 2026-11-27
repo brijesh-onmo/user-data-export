@@ -1,13 +1,18 @@
 "use strict";
 /**
- * Consents for the input product (Mongo `consents`), newest first, across tenants.
+ * Consents across ALL products and tenants (Mongo `consents`), newest first, with a `product` column.
  *
  * Document URL: MySQL documents.assets is keyed by language -> { url, version }.
  * We use the asset for the consent's language. assets only holds the current version, so if
  * the user consented to a different version, the version segment in the URL path
  * (/<lang>/v<N>/) is swapped for the consented one.
  */
-const { formatUtc, label, sourceLabel } = require("../lib/format");
+const {
+  formatUtc,
+  label,
+  sourceLabel,
+  productLabel,
+} = require("../lib/format");
 
 function parseAssets(assets) {
   if (!assets) return {};
@@ -42,6 +47,7 @@ function documentUrl(consent, assetsById) {
 module.exports = {
   name: "consents.csv",
   columns: [
+    "product",
     "consented_on",
     "category",
     "purpose",
@@ -52,14 +58,15 @@ module.exports = {
     "source",
   ],
 
-  source: ({ mongo, userId, productId }) =>
+  source: ({ mongo, userId }) =>
     mongo
       .collection("consents")
       .find(
-        { userId, productId },
+        { userId },
         {
           projection: {
             _id: 0,
+            productId: 1,
             category: 1,
             purpose: 1,
             action: 1,
@@ -88,6 +95,7 @@ module.exports = {
     }
 
     return consents.map((c) => ({
+      product: productLabel(c.productId),
       consented_on: formatUtc(c.createdAt),
       category: label(c.category),
       purpose: label(c.purpose),

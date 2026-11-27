@@ -1,36 +1,27 @@
 "use strict";
 /**
- * Achievements: current tier, stored progress and next tier target.
+ * Achievements: current tier, stored progress and next tier target. NOT product or tenant specific.
  *
- * Rules (Mongo event_rules, active only): kept when parameters.metadata.achievementType is set.
+ * 1. Rules: every rule in Mongo event_rules with a parameters.metadata.achievementType, ACTIVE OR
+ *    INACTIVE (a rule switched off doesn't erase the user's progress).
+ * 2. Progress: the user's event_data records for all of those rules (index_id = userId), one query.
+ *    Every rule the user has a record for becomes a row. product = the rule's
+ *    metadata.achievementProductId (productLabel), empty for generic rules.
+ *    The progress value is one field of data, chosen by ruleType. Unknown ruleType / non-numeric
+ *    value -> blank progress, unit "Unknown", warning logged.
+ * 3. Current tier: MySQL item_buckets, SUM(balance) of unexpired achievement buckets per type.
+ * 4. Tier-only: an achievementType with a tier but no progress record for any rule still gets a row
+ *    (name + tier; product, progress and target empty).
  *
- *   RULE HIERARCHY — one rule is chosen per achievementType:
+ * Next tier target: the rule's rewardDistribution sorted by threshold, entry at index currentTier
+ * (tier 0 -> first threshold). Blank when there is no next tier.
  *
- *   Step 1. Exclude rules that don't apply to this user:
- *           - metadata.achievementTenantId is set and is not the user's tenant (users.tenant_id)
- *           - metadata.achievementProductId is set and is not the input productId
- *
- *   Step 2. From what's left, pick the most specific (1 = highest):
- *           1. Tenant + product  both achievementTenantId and achievementProductId set (and matching)
- *           2. Tenant only       achievementTenantId set, no achievementProductId
- *           3. Product only      achievementProductId set, no achievementTenantId
- *           4. Generic           neither set
- *
- *   Step 3. Tie at the same level: the rule with the lowest `id` wins (so the result is repeatable;
- *           Mongo's return order isn't guaranteed).
- *
- *   If no rule survives for an achievementType, that achievement is not exported.
- *
- * Progress (Mongo event_data, index_id = userId): one field of data, chosen by ruleType.
- *   No record -> 0 (same as the API). Unknown ruleType / non-numeric value -> blank progress,
- *   unit "Unknown", warning logged.
- * Current tier (MySQL item_buckets): SUM(balance) of unexpired achievement buckets per type.
- *   WARNING: not product-specific (see the note above the item_buckets query).
- * Next tier target: rewardDistribution sorted by threshold, entry at index currentTier
- *   (tier 0 -> first threshold). Blank when there is no next tier.
- * Only achievements relevant to the user: a progress record or a tier above 0.
+ * WARNING: current tier is NOT product-specific. item_buckets has no product column, so the tier is
+ * the user's total for the achievementType across all products. If the user has records for several
+ * rules of the same type (e.g. an aaa rule and a generic one), each row shows the same tier, and each
+ * row's next target applies that shared tier to its own rule's thresholds.
  */
-const { label } = require("../lib/format");
+const { label, productLabel } = require("../lib/format");
 
 const PROGRESS = {
   REWARD_FOR_PLAY: { unit: "Plays", value: (d) => d.playCount },
@@ -69,37 +60,6 @@ function listLength(v) {
   return Array.isArray(v) ? v.length : MALFORMED;
 }
 
-// Rule hierarchy level (see header): 1 = tenant + product, 2 = tenant only, 3 = product only,
-// 4 = generic, null = rule doesn't apply to this user
-function ruleLevel(meta, tenantId, productId) {
-  const ruleTenant = meta.achievementTenantId || null;
-  const ruleProduct = meta.achievementProductId || null;
-  if (ruleTenant && ruleTenant !== tenantId) return null;
-  if (ruleProduct && ruleProduct !== productId) return null;
-  if (ruleTenant && ruleProduct) return 1;
-  if (ruleTenant) return 2;
-  if (ruleProduct) return 3;
-  return 4;
-}
-
-function pickRules(rules, tenantId, productId) {
-  const best = new Map(); // achievementType -> { rule, level }
-  for (const rule of rules) {
-    const meta = rule.parameters?.metadata ?? {};
-    const type = meta.achievementType;
-    if (typeof type !== "string" || !type) continue;
-    const level = ruleLevel(meta, tenantId, productId);
-    if (level === null) continue;
-    const current = best.get(type);
-    const better =
-      !current ||
-      level < current.level ||
-      (level === current.level && String(rule.id) < String(current.rule.id));
-    if (better) best.set(type, { rule, level });
-  }
-  return best;
-}
-
 function progressFor(rule, record, userId) {
   const def = PROGRESS[rule.ruleType];
   if (!def) {
@@ -110,7 +70,6 @@ function progressFor(rule, record, userId) {
     });
     return { progress: null, unit: "Unknown" };
   }
-  if (!record) return { progress: 0, unit: def.unit };
   const v = def.value(record.data ?? {});
   if (v === undefined || v === null) return { progress: 0, unit: def.unit };
   if (v === MALFORMED || typeof v !== "number" || !Number.isFinite(v)) {
@@ -131,16 +90,12 @@ function nextTarget(rule, currentTier) {
   return tiers[currentTier]?.threshold ?? null;
 }
 
-async function* source({ knex, mongo, userId, productId }) {
-  const [[user]] = await knex.raw("SELECT tenant_id FROM users WHERE id = ?", [
-    userId,
-  ]);
-  const tenantId = user?.tenant_id ?? null;
-
+async function* source({ knex, mongo, userId }) {
+  // 1. every achievement rule, active or not
   const rules = await mongo
     .collection("event_rules")
     .find(
-      { active: true },
+      { "parameters.metadata.achievementType": { $type: "string", $ne: "" } },
       {
         projection: {
           _id: 0,
@@ -152,23 +107,20 @@ async function* source({ knex, mongo, userId, productId }) {
       },
     )
     .toArray();
-  const selected = pickRules(rules, tenantId, productId);
-  if (!selected.size) return;
+  const ruleById = new Map(rules.filter((r) => r.id).map((r) => [r.id, r]));
 
-  const ruleIds = [...selected.values()].map(({ rule }) => rule.id);
-  const records = await mongo
-    .collection("event_data")
-    .find(
-      { $or: ruleIds.map((id) => ({ rule_id: id, index_id: userId })) },
-      { projection: { _id: 0, rule_id: 1, data: 1 } },
-    )
-    .toArray();
-  const recordByRule = new Map(records.map((r) => [r.rule_id, r]));
+  // 2. the user's progress records for those rules
+  const records = ruleById.size
+    ? await mongo
+        .collection("event_data")
+        .find(
+          { index_id: userId, rule_id: { $in: [...ruleById.keys()] } },
+          { projection: { _id: 0, rule_id: 1, data: 1 } },
+        )
+        .toArray()
+    : [];
 
-  // WARNING: current tier is NOT product-specific. item_buckets has no product column, so the tier is
-  // the user's total for the achievementType across all products, while progress and next tier target
-  // come from the rule selected for the input product. If the same achievementType has different
-  // rules per product, the tier and the target can come from different products' achievements.
+  // 3. current tier per achievement type (all products)
   const [buckets] = await knex.raw(
     `SELECT item_type, SUM(balance) AS current_tier
        FROM item_buckets
@@ -184,13 +136,18 @@ async function* source({ knex, mongo, userId, productId }) {
   );
 
   const rows = [];
-  for (const [type, { rule }] of selected) {
-    const record = recordByRule.get(rule.id);
-    const currentTier = tierByType.get(type) ?? 0;
-    if (!record && currentTier === 0) continue; // not relevant to this user
+  const typesWithRows = new Set();
 
+  for (const record of records) {
+    const rule = ruleById.get(record.rule_id);
+    if (!rule) continue;
+    const meta = rule.parameters?.metadata ?? {};
+    const type = meta.achievementType;
+    const currentTier = tierByType.get(type) ?? 0;
     const { progress, unit } = progressFor(rule, record, userId);
+    typesWithRows.add(type);
     rows.push({
+      product: productLabel(meta.achievementProductId || null),
       name: label(type),
       current_tier: currentTier,
       progress,
@@ -199,13 +156,31 @@ async function* source({ knex, mongo, userId, productId }) {
     });
   }
 
-  rows.sort((a, b) => a.name.localeCompare(b.name));
+  // 4. tier but no progress record for any rule of that type
+  for (const [type, currentTier] of tierByType) {
+    if (typesWithRows.has(type) || !(currentTier > 0)) continue;
+    rows.push({
+      product: null,
+      name: label(type),
+      current_tier: currentTier,
+      progress: null,
+      progress_unit: null,
+      next_tier_target: null,
+    });
+  }
+
+  rows.sort(
+    (a, b) =>
+      a.name.localeCompare(b.name) ||
+      (a.product ?? "").localeCompare(b.product ?? ""),
+  );
   yield* rows;
 }
 
 module.exports = {
   name: "achievements.csv",
   columns: [
+    "product",
     "name",
     "current_tier",
     "progress",

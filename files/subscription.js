@@ -1,11 +1,11 @@
 "use strict";
 /**
- * The user's current subscription(s) for the input product (user_subscription has one row per
- * user + product + tenant). Plan details from subscription_plans; payment details from
+ * The user's current subscription(s) across ALL products, with a `product` column
+ * (user_subscription has one row per user + product + tenant). Plan details from subscription_plans; payment details from
  * subscription_mandates when the current period came from a mandate (type = MANDATE).
  * Gateway IDs, tokens and metadata are deliberately not exported.
  */
-const { label } = require("../lib/format");
+const { label, productLabel } = require("../lib/format");
 
 const TYPE_LABELS = {
   VOUCHER: "Voucher",
@@ -52,6 +52,7 @@ const money = (v) =>
 module.exports = {
   name: "subscription.csv",
   columns: [
+    "product",
     "plan_name",
     "status",
     "subscribed_via",
@@ -68,8 +69,9 @@ module.exports = {
     "mandate_cancelled_on",
   ],
 
-  query: ({ userId, productId }) => [
+  query: ({ userId }) => [
     `SELECT
+       us.product_id,
        sp.labels,
        us.status,
        us.type,
@@ -87,13 +89,14 @@ module.exports = {
      FROM user_subscription us
      LEFT JOIN subscription_plans sp    ON sp.id = us.plan_id
      LEFT JOIN subscription_mandates m  ON us.type = 'MANDATE' AND m.id = us.reference_id
-     WHERE us.user_id = ? AND us.product_id = ?
-     ORDER BY us.valid_until DESC`,
-    [userId, productId],
+     WHERE us.user_id = ?
+     ORDER BY us.product_id, us.valid_until DESC`,
+    [userId],
   ],
 
   enrich: async (rows) =>
     rows.map((r) => ({
+      product: productLabel(r.product_id),
       plan_name: planNames(r.labels),
       status: label(r.status),
       subscribed_via: mapped(TYPE_LABELS, r.type),

@@ -1,7 +1,7 @@
 "use strict";
 /**
- * The user's non-disabled profiles, oldest first.
- * Which products get this file: lib/product-files.js.
+ * The user's non-disabled profiles, oldest first. Exported for every product
+ * (profiles aren't product specific).
  */
 module.exports = {
   name: "profiles.csv",

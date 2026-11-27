@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Every game session of the user for the input product, newest first, across all profiles.
+ * Every game session of the user across ALL products and profiles, newest first, with a `product` column.
  *
  * Why it's built this way:
  * - All joins are LEFT JOIN: older sessions have no game_play_id / game_participant_id and must
@@ -8,8 +8,8 @@
  * - No publish_status filter: delisted games were still played.
  * - The participant join uses game_sessions.game_participant_id AND user_id, never game_play_id:
  *   in multiplayer modes game_play_id would return other players' rows.
- * - Product: game_plays.product_id. Legacy sessions have no game_play, so they count as
- *   LEGACY_PRODUCT ('onmo') and only appear in ONMO exports.
+ * - Product: from game_plays.product_id (productLabel). Legacy sessions have no game_play, so their
+ *   product is blank.
  * - Rows are streamed from one query (no OFFSET paging), so heavy players don't fill memory.
  *   Point MYSQL_HOST at a read replica. If EXPLAIN shows a filesort on large accounts, consider a
  *   (user_id, created_at, id) index on game_sessions.
@@ -23,7 +23,7 @@
  * - Offer configuration: game_plays.payment_modes / payouts (the user's own payment_mode and prize are kept).
  * - IDs: session, game, play and profile ids.
  */
-const { label, coinLabel } = require("../lib/format");
+const { label, coinLabel, productLabel } = require("../lib/format");
 
 const STATUS_LABELS = {
   CREATED: "Not Started",
@@ -33,9 +33,6 @@ const STATUS_LABELS = {
   REVIEWED: "Closed", // legacy
 };
 const HIDDEN_CLOSE_REASONS = new Set(["CHEAT_DETECTED"]);
-
-// product of legacy sessions (no game_play row)
-const LEGACY_PRODUCT = "onmo";
 
 // JSON_UNQUOTE gives the string "null" for a JSON null
 const clean = (v) =>
@@ -125,6 +122,7 @@ const asNumber = (v) => (clean(v) === null ? null : Number(v));
 module.exports = {
   name: "game_sessions.csv",
   columns: [
+    "product",
     "started_at",
     "last_updated_at",
     "profile_name",
@@ -151,8 +149,9 @@ module.exports = {
   ],
 
   // JSON_UNQUOTE(JSON_EXTRACT()) instead of ->> so it also runs on MariaDB
-  query: ({ userId, productId }) => [
+  query: ({ userId }) => [
     `SELECT
+       gp.product_id,
        DATE_FORMAT(gs.created_at, '%Y-%m-%d %H:%i:%s')                       AS started_at,
        DATE_FORMAT(gs.updated_at, '%Y-%m-%d %H:%i:%s')                       AS last_updated_at,
        p.username                                                            AS profile_name,
@@ -188,9 +187,8 @@ module.exports = {
             ON p.id = COALESCE(gpart.profile_id, gs.user_id)
            AND p.user_id = gs.user_id
      WHERE gs.user_id = ?
-       AND COALESCE(gp.product_id, ?) = ?               -- legacy sessions (no game_play) = 'onmo'
      ORDER BY gs.created_at DESC, gs.id DESC`,
-    [userId, LEGACY_PRODUCT, productId],
+    [userId],
   ],
 
   // one inventory lookup per batch, for inventory prizes
@@ -208,6 +206,7 @@ module.exports = {
     return rows.map((r) => {
       const closeReason = clean(r.close_reason);
       return {
+        product: productLabel(r.product_id), // blank for legacy sessions (no game_play)
         started_at: r.started_at,
         last_updated_at: r.last_updated_at,
         profile_name: r.profile_name ?? null,

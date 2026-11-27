@@ -4,26 +4,26 @@ Every export is a zip of the CSV files below, in this order. All dates are UTC, 
 
 Input: `{ "userId": "<users.id>", "productId": "<products.id>" }`
 
-| File                          | Product specific?                           |
-| ----------------------------- | ------------------------------------------- |
-| account.csv                   | No                                          |
-| profiles.csv                  | Partially (only `aaa`)                      |
-| login_history.csv             | Yes                                         |
-| items.csv                     | No                                          |
-| linked_accounts.csv           | Partially (only `aaa`)                      |
-| friends.csv                   | Partially (all products except `aaa`)       |
-| device_settings.csv           | No                                          |
-| communication_preferences.csv | Yes                                         |
-| game_library.csv              | Yes                                         |
-| consents.csv                  | Yes                                         |
-| subscription.csv              | Yes                                         |
-| transactions.csv              | Partly: subscription rows yes, coin rows no |
-| achievements.csv              | Partly: rules yes, current tier no          |
-| game_sessions.csv             | Yes (legacy sessions count as `onmo`)       |
-| wallets.csv                   | No                                          |
-| unread_notifications.csv      | No                                          |
+Files, in zip order:
 
-Which product gets `profiles.csv`, `linked_accounts.csv` and `friends.csv` is decided in one place: `HEADER_ONLY_FILES` in `lib/product-files.js`. When a file doesn't apply to the requested product, it's still in the zip with the header row only.
+- account.csv
+- profiles.csv
+- login_history.csv
+- items.csv
+- linked_accounts.csv
+- friends.csv
+- device_settings.csv
+- communication_preferences.csv
+- game_library.csv
+- consents.csv
+- subscription.csv
+- transactions.csv
+- achievements.csv
+- game_sessions.csv
+- wallets.csv
+- unread_notifications.csv
+
+Nothing is filtered by product: data from every product is exported, and files that hold product-specific data have a `product` column.
 
 ---
 
@@ -45,8 +45,6 @@ Source: MySQL `users`
 
 Source: MySQL `profiles` (disabled profiles excluded)
 
-Profiles are only supported by product `aaa`. For any other product the file contains the header row only.
-
 | Column      | Description           |
 | ----------- | --------------------- |
 | name        | Profile username      |
@@ -58,15 +56,16 @@ Profiles are only supported by product `aaa`. For any other product the file con
 
 ## login_history.csv
 
-Source: Redis (check-ins not yet synced) + MySQL `user_checkins`. Newest first.
+Source: Redis (check-ins not yet synced, for every product in `products`) + MySQL `user_checkins`. All products, merged newest first.
 
-| Column     | Description                                                  |
-| ---------- | ------------------------------------------------------------ |
-| ip_address | IP address                                                   |
-| timestamp  | Check-in time (Redis rows use the user's last check-in time) |
-| country    | Country as stored (empty for Redis rows)                     |
-| user_agent | User agent text (empty for Redis rows)                       |
-| device     | Device as stored (empty for Redis rows)                      |
+| Column     | Description                                                                   |
+| ---------- | ----------------------------------------------------------------------------- |
+| product    | `Onmoplus` (aaa), `Onmo` (onmo), `Challenges Arena` (ca); other ids as stored |
+| ip_address | IP address                                                                    |
+| timestamp  | Check-in time (Redis rows use the user's last check-in time)                  |
+| country    | Country as stored (empty for Redis rows)                                      |
+| user_agent | User agent text (empty for Redis rows)                                        |
+| device     | Device as stored (empty for Redis rows)                                       |
 
 ## items.csv
 
@@ -81,8 +80,6 @@ Source: MySQL `item_transactions` (inventory wallet) + `inventory`. What the use
 ## linked_accounts.csv
 
 Source: EON API (`/rm/cda/checkuserlogin`), one call per non-disabled profile.
-
-Only generated when `productId` is `aaa`. For any other product the file contains the header row only.
 
 | Column       | Description                               |
 | ------------ | ----------------------------------------- |
@@ -99,8 +96,6 @@ Only generated when `productId` is `aaa`. For any other product the file contain
 ## friends.csv
 
 Source: MySQL `user_followers` + `users`. Disabled users are included (the relationship is the requester's data); service users are excluded. People the user follows first, then followers not followed back; each newest first.
-
-Product `aaa` does not support friends: for `aaa` the file contains the header row only.
 
 | Column            | Description                                       |
 | ----------------- | ------------------------------------------------- |
@@ -126,73 +121,78 @@ Scope by key: `preferred_eon_cluster` = profile; `streaming_config` = device; `d
 
 ## communication_preferences.csv
 
-Source: MySQL `user_metadata` (`notification_preferences`, account level) for the input product.
+Source: MySQL `user_metadata` (`notification_preferences`, account level). Every product section, with a `product` column.
 
-- `Account` is on by default and isn't stored. Every channel shown gets an `Account, Yes, Default` row. For `aaa`, `WhatsApp, Account, Yes, Default` is always present, even when nothing is stored; other products only show channels that have stored data (header only if none).
+- `Account` is on by default and isn't stored. Every channel shown gets an `Account, Yes, Default` row. `Onmoplus, WhatsApp, Account, Yes, Default` is always present, even when nothing is stored; other products only show channels that have stored data.
 - Other categories appear only when stored; a category that isn't stored means the user isn't receiving it.
 
-| Column                 | Description                                                        |
-| ---------------------- | ------------------------------------------------------------------ |
-| channel                | e.g. `WhatsApp`                                                    |
-| category               | `Account`, `Updates`, `Engagement`                                 |
-| opted_in               | Yes / No (`Account` is always Yes)                                 |
-| changed_via            | `Settings` or `Prompt`; `Default` for the Account row              |
-| last_updated_at        | When the category was last changed (empty for the Account default) |
-| times_prompt_dismissed | Opt-in prompt dismissals (per channel, repeated on each row)       |
-| last_dismissed_on      | Last prompt dismissal (per channel, repeated on each row)          |
+| Column                 | Description                                                                   |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| product                | `Onmoplus` (aaa), `Onmo` (onmo), `Challenges Arena` (ca); other ids as stored |
+| channel                | e.g. `WhatsApp`                                                               |
+| category               | `Account`, `Updates`, `Engagement`                                            |
+| opted_in               | Yes / No (`Account` is always Yes)                                            |
+| changed_via            | `Settings` or `Prompt`; `Default` for the Account row                         |
+| last_updated_at        | When the category was last changed (empty for the Account default)            |
+| times_prompt_dismissed | Opt-in prompt dismissals (per channel, repeated on each row)                  |
+| last_dismissed_on      | Last prompt dismissal (per channel, repeated on each row)                     |
 
 ## game_library.csv
 
-Source: MySQL `user_game_library` + `games`. Non-disabled profiles; by profile, newest first.
+Source: MySQL `user_game_library` + `games`. All products; non-disabled profiles; by product, then profile, newest first.
 
-| Column       | Description             |
-| ------------ | ----------------------- |
-| profile_name | Profile username        |
-| game         | Game title              |
-| added_on     | When the game was added |
+| Column       | Description                                                                   |
+| ------------ | ----------------------------------------------------------------------------- |
+| product      | `Onmoplus` (aaa), `Onmo` (onmo), `Challenges Arena` (ca); other ids as stored |
+| profile_name | Profile username                                                              |
+| game         | Game title                                                                    |
+| added_on     | When the game was added                                                       |
 
 ## consents.csv
 
-Source: Mongo `consents` + MySQL `documents`. Newest first.
+Source: Mongo `consents` + MySQL `documents`. All products, newest first.
 
-| Column       | Description                                                         |
-| ------------ | ------------------------------------------------------------------- |
-| consented_on | When the consent was recorded                                       |
-| category     | e.g. `Legal`, `Cookies`                                             |
-| purpose      | e.g. `Privacy Policy`, `Age Declaration`                            |
-| action       | e.g. `Accepted`, `Rejected`                                         |
-| document_url | URL of the document version consented to, in the consent's language |
-| shown_text   | Text shown to the user                                              |
-| language     | Language as stored                                                  |
-| source       | e.g. `Login`, `Cookie Banner`                                       |
+| Column       | Description                                                                   |
+| ------------ | ----------------------------------------------------------------------------- |
+| product      | `Onmoplus` (aaa), `Onmo` (onmo), `Challenges Arena` (ca); other ids as stored |
+| consented_on | When the consent was recorded                                                 |
+| category     | e.g. `Legal`, `Cookies`                                                       |
+| purpose      | e.g. `Privacy Policy`, `Age Declaration`                                      |
+| action       | e.g. `Accepted`, `Rejected`                                                   |
+| document_url | URL of the document version consented to, in the consent's language           |
+| shown_text   | Text shown to the user                                                        |
+| language     | Language as stored                                                            |
+| source       | e.g. `Login`, `Cookie Banner`                                                 |
 
 ## subscription.csv
 
-Source: MySQL `user_subscription` + `subscription_plans` + `subscription_mandates`. Current subscription(s) only.
+Source: MySQL `user_subscription` + `subscription_plans` + `subscription_mandates`. Current subscription(s) for every product.
 
-| Column               | Description                                                                |
-| -------------------- | -------------------------------------------------------------------------- |
-| plan_name            | Plan title in every language, e.g. `en: Essential Pass; es: Pase esencial` |
-| status               | `Active`, `Pending`, `Expired`, `Cancelled`                                |
-| subscribed_via       | `Voucher`, `Mandate`, `One-time`                                           |
-| price                | Plan amount, 2 decimals                                                    |
-| currency             | From the plan's metadata (e.g. `INR`)                                      |
-| plan_duration_days   | Plan duration in days                                                      |
-| current_period_start | Start of the current period                                                |
-| current_period_end   | End of the current period                                                  |
-| auto_renew           | Yes / No                                                                   |
-| subscribed_on        | When the subscription was created                                          |
-| payment_provider     | `Razorpay`, `Juspay`, `OnmoPay` (mandate subscriptions only)               |
-| payment_method       | As stored, e.g. `upi` (mandate subscriptions only)                         |
-| billing_frequency    | e.g. `Monthly` (mandate subscriptions only)                                |
-| mandate_cancelled_on | When the mandate was cancelled (mandate subscriptions only)                |
+| Column               | Description                                                                   |
+| -------------------- | ----------------------------------------------------------------------------- |
+| product              | `Onmoplus` (aaa), `Onmo` (onmo), `Challenges Arena` (ca); other ids as stored |
+| plan_name            | Plan title in every language, e.g. `en: Essential Pass; es: Pase esencial`    |
+| status               | `Active`, `Pending`, `Expired`, `Cancelled`                                   |
+| subscribed_via       | `Voucher`, `Mandate`, `One-time`                                              |
+| price                | Plan amount, 2 decimals                                                       |
+| currency             | From the plan's metadata (e.g. `INR`)                                         |
+| plan_duration_days   | Plan duration in days                                                         |
+| current_period_start | Start of the current period                                                   |
+| current_period_end   | End of the current period                                                     |
+| auto_renew           | Yes / No                                                                      |
+| subscribed_on        | When the subscription was created                                             |
+| payment_provider     | `Razorpay`, `Juspay`, `OnmoPay` (mandate subscriptions only)                  |
+| payment_method       | As stored, e.g. `upi` (mandate subscriptions only)                            |
+| billing_frequency    | e.g. `Monthly` (mandate subscriptions only)                                   |
+| mandate_cancelled_on | When the mandate was cancelled (mandate subscriptions only)                   |
 
 ## transactions.csv
 
-Source: MySQL `item_transactions` (coin wallet, all products) + `payment_transactions` (input product). Merged, newest first.
+Source: MySQL `item_transactions` (coin wallet) + `payment_transactions`, all products. Merged, newest first.
 
 | Column         | Coin rows                                                      | Subscription rows                                                                          |
 | -------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| product        | Empty                                                          | `Onmoplus` (aaa), `Onmo` (onmo), `Challenges Arena` (ca); other ids as stored              |
 | date           | Transaction date                                               | Payment date                                                                               |
 | category       | `Coins`                                                        | `Subscription`                                                                             |
 | type           | Readable transaction type (e.g. `Win`, `Expired`, `Inventory`) | `Autopay Activation`, `Autopay Renewal`, `One-time Purchase`, `Voucher Redemption`         |
@@ -208,47 +208,47 @@ Source: MySQL `item_transactions` (coin wallet, all products) + `payment_transac
 
 ## achievements.csv
 
-Source: Mongo `event_rules` + `event_data`, MySQL `item_buckets` (achievement wallet). Only achievements the user has progress or a tier in; sorted by name.
+Source: Mongo `event_rules` (every achievement rule, active or inactive) + `event_data`, MySQL `item_buckets` (achievement wallet). Not product or tenant specific. One row per rule the user has a progress record for, plus one row per achievement the user holds a tier in without any progress record. Sorted by name, then product.
 
-| Column           | Description                                                        |
-| ---------------- | ------------------------------------------------------------------ |
-| name             | From `achievementType`, e.g. `Time Played`                         |
-| current_tier     | Sum of unexpired achievement buckets (not product specific)        |
-| progress         | Stored progress total (0 if no record; empty if unknown/malformed) |
-| progress_unit    | e.g. `Seconds`, `Wins`, `Days` (`Unknown` if unknown/malformed)    |
-| next_tier_target | Threshold of the next tier; empty when at the top tier             |
-
-Rule chosen per achievement: tenant + product, then tenant only, then product only, then generic; lowest rule id on ties.
+| Column           | Description                                                                                                                  |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| product          | The rule's product (`Onmoplus`, `Onmo`, `Challenges Arena`, other ids as stored); empty for generic rules and tier-only rows |
+| name             | From `achievementType`, e.g. `Time Played`                                                                                   |
+| current_tier     | Sum of unexpired achievement buckets for the type (shared by all rows of that type)                                          |
+| progress         | Stored progress total (empty if unknown/malformed, and on tier-only rows)                                                    |
+| progress_unit    | e.g. `Seconds`, `Wins`, `Days` (`Unknown` if unknown/malformed; empty on tier-only rows)                                     |
+| next_tier_target | The rule's threshold at index `current_tier`; empty at the top tier and on tier-only rows                                    |
 
 ## game_sessions.csv
 
-Source: MySQL `game_sessions` + `game_plays` + `game_participants` (own row only) + `games` + `profiles` + `inventory`. All profiles; newest first. Legacy sessions with no game play count as product `onmo`.
+Source: MySQL `game_sessions` + `game_plays` + `game_participants` (own row only) + `games` + `profiles` + `inventory`. All products and profiles; newest first. Legacy sessions with no game play have an empty `product`.
 
-| Column               | Description                                                                        |
-| -------------------- | ---------------------------------------------------------------------------------- |
-| started_at           | Session start                                                                      |
-| last_updated_at      | Last update                                                                        |
-| profile_name         | Profile that played (empty if the account has no profile row)                      |
-| game                 | Game title                                                                         |
-| game_mode            | e.g. `Casual Stream`, `House Battle`                                               |
-| status               | `Not Started`, `Playing`, `Closed` (legacy `CHEATED`/`REVIEWED` shown as `Closed`) |
-| close_reason         | `Manual`, `Expired` (cheat-detected closes shown empty)                            |
-| duration_seconds     | Session duration                                                                   |
-| score                | Session score                                                                      |
-| result               | e.g. `Win`, `Loss`, `Pending`, `Closed`                                            |
-| paid                 | Yes / No                                                                           |
-| payment_mode         | e.g. `50 Basic`, `Subscription` (unknown shapes as raw JSON)                       |
-| prizes               | e.g. `20 Gems`, item titles (unknown shapes as raw JSON)                           |
-| device_make          | Device make                                                                        |
-| device_model         | Device model                                                                       |
-| device_type          | Device type                                                                        |
-| device_os            | Device OS                                                                          |
-| app_version          | App version                                                                        |
-| ip_address           | Client IP                                                                          |
-| city                 | Client city                                                                        |
-| region               | Client region                                                                      |
-| isp                  | Client ISP                                                                         |
-| poor_network_seconds | Seconds of poor network                                                            |
+| Column               | Description                                                                                              |
+| -------------------- | -------------------------------------------------------------------------------------------------------- |
+| product              | `Onmoplus` (aaa), `Onmo` (onmo), `Challenges Arena` (ca); other ids as stored; empty for legacy sessions |
+| started_at           | Session start                                                                                            |
+| last_updated_at      | Last update                                                                                              |
+| profile_name         | Profile that played (empty if the account has no profile row)                                            |
+| game                 | Game title                                                                                               |
+| game_mode            | e.g. `Casual Stream`, `House Battle`                                                                     |
+| status               | `Not Started`, `Playing`, `Closed` (legacy `CHEATED`/`REVIEWED` shown as `Closed`)                       |
+| close_reason         | `Manual`, `Expired` (cheat-detected closes shown empty)                                                  |
+| duration_seconds     | Session duration                                                                                         |
+| score                | Session score                                                                                            |
+| result               | e.g. `Win`, `Loss`, `Pending`, `Closed`                                                                  |
+| paid                 | Yes / No                                                                                                 |
+| payment_mode         | e.g. `50 Basic`, `Subscription` (unknown shapes as raw JSON)                                             |
+| prizes               | e.g. `20 Gems`, item titles (unknown shapes as raw JSON)                                                 |
+| device_make          | Device make                                                                                              |
+| device_model         | Device model                                                                                             |
+| device_type          | Device type                                                                                              |
+| device_os            | Device OS                                                                                                |
+| app_version          | App version                                                                                              |
+| ip_address           | Client IP                                                                                                |
+| city                 | Client city                                                                                              |
+| region               | Client region                                                                                            |
+| isp                  | Client ISP                                                                                               |
+| poor_network_seconds | Seconds of poor network                                                                                  |
 
 ## wallets.csv
 
